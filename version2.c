@@ -1,4 +1,4 @@
-// chat_v2.c
+//chat version 2 with multiple connections
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,20 +44,13 @@ int add_peer(SOCKET sock, const char* ip, int port) {
 void remove_peer(int id) {
     EnterCriticalSection(&peer_list_lock);
     for (int i = 0; i < MAX_PEERS; i++) {
-        if (peer_list[i].id == id) {
-            if (!peer_list[i].active) {
-                printf("Error: Connection ID %d is already terminated.\n", id);
-                LeaveCriticalSection(&peer_list_lock);
-                return;
-            }
+        if (peer_list[i].active && peer_list[i].id == id) {
             closesocket(peer_list[i].socket);
             peer_list[i].active = 0;
             printf("Peer %d terminated.\n", id);
-            LeaveCriticalSection(&peer_list_lock);
-            return;
+            break;
         }
     }
-    printf("Error: Invalid connection ID %d.\n", id);
     LeaveCriticalSection(&peer_list_lock);
 }
 
@@ -136,19 +129,9 @@ DWORD WINAPI receive_messages(LPVOID socket_ptr) {
         buffer[bytes_received] = '\0';
         if (strcmp(buffer, "EXIT") == 0) {
             printf("\n[Info] Peer %s:%d has exited.\n> ", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-            // Mark peer as inactive
-            EnterCriticalSection(&peer_list_lock);
-            for (int i = 0; i < MAX_PEERS; i++) {
-                if (peer_list[i].socket == sock) {
-                    peer_list[i].active = 0;
-                    break;
-                }
-            }
-            LeaveCriticalSection(&peer_list_lock);
             break;
         }
-        printf("\nMessage received from %s\nSender's Port: %d\nMessage: \"%s\"\n> ",
-               inet_ntoa(addr.sin_addr), ntohs(addr.sin_port), buffer);
+        printf("\nMessage received from %s\nSender's Port: %d\nMessage: \"%s\"\n> ", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port), buffer);
         fflush(stdout);
     }
     return 0;
